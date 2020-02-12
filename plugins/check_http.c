@@ -118,6 +118,7 @@ int onredirect = STATE_OK;
 int followsticky = STICKY_NONE;
 int use_ssl = FALSE;
 int use_sni = FALSE;
+int use_proxy_protocol = FALSE;
 int verbose = FALSE;
 int show_extended_perfdata = FALSE;
 int show_url = FALSE;
@@ -262,6 +263,7 @@ process_arguments (int argc, char **argv)
         {"max-age", required_argument, 0, 'M'},
         {"content-type", required_argument, 0, 'T'},
         {"pagesize", required_argument, 0, 'm'},
+        {"proxy-protocol", no_argument, 0, 'x'},
         {"invert-regex", no_argument, NULL, INVERT_REGEX},
         {"use-ipv4", no_argument, 0, '4'},
         {"use-ipv6", no_argument, 0, '6'},
@@ -287,7 +289,7 @@ process_arguments (int argc, char **argv)
     }
 
     while (1) {
-        c = getopt_long (argc, argv, "Vvh46t:c:w:A:k:H:P:j:T:I:a:b:d:e:p:s:R:r:u:f:C:J:K:nlLS::m:M:NEU", longopts, &option);
+        c = getopt_long (argc, argv, "Vvh46t:c:w:A:k:H:P:j:T:I:a:b:d:e:p:s:R:r:u:f:C:J:K:nlLS::m:M:xNEU", longopts, &option);
         if (c == -1 || c == EOF)
             break;
 
@@ -540,6 +542,9 @@ enable_ssl:
                 min_page_len = atoi (optarg);
             break;
         }
+	case 'x':
+            use_proxy_protocol = TRUE;
+	    break;
         case 'N': /* no-body */
             no_body = TRUE;
             break;
@@ -1060,6 +1065,12 @@ check_http (void)
         read (sd, buffer, MAX_INPUT_BUFFER-1);
         if (verbose) printf ("%s", buffer);
         /* Here we should check if we got HTTP/1.1 200 Connection established */
+    }
+    if (use_proxy_protocol == TRUE) {
+        if (verbose) printf ("Sending PROXY PROTOCOL\r\n");
+        asprintf (&buf, "PROXY TCP4 127.0.0.1 %s 12345 %d\r\n", server_address, server_port);
+        send(sd, buf, strlen (buf), 0);
+        buf[0]='\0';
     }
 #ifdef HAVE_SSL
     elapsed_time_connect = (double)microsec_connect / 1.0e6;
@@ -1836,6 +1847,8 @@ print_help (void)
     printf ("    %s\n", _("specified IP address. stickyport also ensures port stays the same."));
     printf (" %s\n", "-m, --pagesize=INTEGER<:INTEGER>");
     printf ("    %s\n", _("Minimum page size required (bytes) : Maximum page size required (bytes)"));
+    printf (" %s\n", "-x, --proxy-protocol");
+    printf ("    %s\n", _("Makes the check use the PROXY PROTOCOL"));
 
     printf (UT_WARN_CRIT);
 
